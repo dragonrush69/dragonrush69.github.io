@@ -35,3 +35,5 @@ button:hover { background: var(--btn-hover); }
 button:disabled { opacity: 0.6; cursor: default; }
 [hidden] { display: none !important; }
 #signin-discord { margin-top: 10px; }
+.primary-link { display: block; padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; text-align: center;
+  background: var(--accent); color: var(--card); font-weight: 600; text-decoration: none; }
