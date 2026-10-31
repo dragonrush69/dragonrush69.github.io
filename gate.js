@@ -9,6 +9,7 @@
   const SUPABASE_KEY = "sb_publishable_MdS2iKjJz50Ge7UkQVq4LA_b7htOMnV";
   const APP = document.documentElement.dataset.app;
 
+  const startHash = location.hash, startSearch = location.search;   // before the client tidies the address
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const $ = (id) => document.getElementById(id);
 
@@ -39,11 +40,37 @@
     show("signed-out");
   }
 
+
+  // A refused sign-in comes back with the reason in the address (#error=…)
+  // and used to just show "Sign in" again, a loop (Kirsty, 2026-10-31).
+  // Show the reason, in plain words where we know it.
+  function authErrorText() {
+    const p = new URLSearchParams((startHash || "").replace(/^#/, "") + "&" + (startSearch || "").replace(/^\?/, ""));
+    const raw = p.get("error_description") || p.get("error");
+    if (!raw) return null;
+    history.replaceState(null, "", location.pathname);
+    const d = raw.replace(/\+/g, " ");
+    if (/email/i.test(d)) return "Discord didn't share a verified email address, so you couldn't be signed in. In Discord, open User Settings › My Account, add and verify your email, then try again — or sign in with Google.";
+    return "Sign-in didn't work: " + d;
+  }
+  function showAuthError(container) {
+    const text = authErrorText();
+    if (!text || !container) return;
+    const el = document.createElement("p");
+    el.className = "auth-error";
+    el.style.cssText = "color:#dc2626;font-size:14px;margin:0 0 12px";
+    el.textContent = text;
+    container.prepend(el);
+  }
+
   async function start() {
     const { data: { session } } = await db.auth.getSession();
-    if (!session) return show("signed-out");
+    if (!session) { showAuthError(document.querySelector('[data-state="signed-out"]')); return show("signed-out"); }
 
     show("loading");
+    // Admins can add someone by Discord username; on their first Discord
+    // sign-in this swaps it for their real email (Kirsty, 2026-10-31).
+    try { await db.rpc("claim_discord_access"); } catch (e) { /* not fatal */ }
     const { data, error } = await db.storage.from("apps").download(`${APP}/index.html`);
     if (error || !data) return show("denied", session.user.email);
 

@@ -90,6 +90,7 @@
 
 <script>
 (function () {
+  const startHash = location.hash, startSearch = location.search;   // before the client tidies the address
   const db = supabase.createClient("https://jssybjxthkhrzxbzpslx.supabase.co", "sb_publishable_MdS2iKjJz50Ge7UkQVq4LA_b7htOMnV");
   const $ = id => document.getElementById(id);
   const show = state => document.querySelectorAll("[data-state]").forEach(el => { el.hidden = el.dataset.state !== state; });
@@ -104,14 +105,38 @@
   $("signin-discord").onclick = () => signIn("discord");
   document.querySelectorAll(".signout").forEach(b => b.onclick = async () => { await db.auth.signOut(); show("signed-out"); });
 
+
+  // A refused sign-in comes back with the reason in the address (#error=…)
+  // and used to just show "Sign in" again, a loop (Kirsty, 2026-10-31).
+  // Show the reason, in plain words where we know it.
+  function authErrorText() {
+    const p = new URLSearchParams((startHash || "").replace(/^#/, "") + "&" + (startSearch || "").replace(/^\?/, ""));
+    const raw = p.get("error_description") || p.get("error");
+    if (!raw) return null;
+    history.replaceState(null, "", location.pathname);
+    const d = raw.replace(/\+/g, " ");
+    if (/email/i.test(d)) return "Discord didn't share a verified email address, so you couldn't be signed in. In Discord, open User Settings › My Account, add and verify your email, then try again — or sign in with Google.";
+    return "Sign-in didn't work: " + d;
+  }
+  function showAuthError(container) {
+    const text = authErrorText();
+    if (!text || !container) return;
+    const el = document.createElement("p");
+    el.className = "auth-error";
+    el.style.cssText = "color:#dc2626;font-size:14px;margin:0 0 12px";
+    el.textContent = text;
+    container.prepend(el);
+  }
+
   async function start() {
     const { data: { session } } = await db.auth.getSession();
-    if (!session) return show("signed-out");
+    if (!session) { showAuthError(document.querySelector('[data-state="signed-out"]')); return show("signed-out"); }
     history.replaceState(null, "", location.pathname);
     const email = (session.user.email || "").toLowerCase();
     document.querySelectorAll(".who").forEach(b => b.textContent = email);
     if (!email) { show("error"); return; }
 
+    try { await db.rpc("claim_discord_access"); } catch (e) { /* not fatal */ }
     const [{ data: access }, { data: reqs }] = await Promise.all([
       db.from("app_access").select("app").eq("email", email).eq("app", "beta"),
       db.from("access_requests").select("player, clan, language, status, created_at").eq("email", email).order("created_at", { ascending: false }).limit(1),
