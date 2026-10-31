@@ -19,16 +19,19 @@
     if (email) $("email").textContent = email;
   }
 
-  async function signIn() {
-    $("signin").disabled = true;
+  // Google or Discord (Kirsty, 2026-10-31). Either way access is by email:
+  // the account's email must be in app_access for this app.
+  async function signIn(provider) {
+    const btn = $(provider === "discord" ? "signin-discord" : "signin");
+    btn.disabled = true;
     const { error } = await db.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: {
         redirectTo: location.origin + location.pathname,
-        queryParams: { prompt: "select_account" },
+        ...(provider === "google" ? { queryParams: { prompt: "select_account" } } : { scopes: "identify email" }),
       },
     });
-    if (error) { $("signin").disabled = false; show("error"); }
+    if (error) { btn.disabled = false; show("error"); }
   }
 
   async function signOut() {
@@ -52,7 +55,8 @@
     document.close();
   }
 
-  $("signin").addEventListener("click", signIn);
+  $("signin").addEventListener("click", () => signIn("google"));
+  if ($("signin-discord")) $("signin-discord").addEventListener("click", () => signIn("discord"));
   $("signout").addEventListener("click", signOut);
   start().catch(() => show("error"));
 })();

@@ -34,3 +34,4 @@ button {
 button:hover { background: var(--btn-hover); }
 button:disabled { opacity: 0.6; cursor: default; }
 [hidden] { display: none !important; }
+#signin-discord { margin-top: 10px; }
